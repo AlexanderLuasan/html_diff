@@ -1,0 +1,24 @@
+{
+    "break_tags":["table","li","head"],
+    "sub_break_tags":{
+        "table":0.7,
+        "li":0.5
+    },
+    "context_escapes":{
+        "table":["td","tr","thead","tfood","tbody"],
+        "head":["title","meta"]
+    },
+    "modify_inside":["li"],
+    "text_tags":[],
+    "no_diff":["head","pre"],
+    "sub_rules":{
+        "break_tags":["tr"],
+        "sub_break_tags":{
+            "tr": 0.5
+        },
+        "modify_inside":["tr"],
+        "sub_rules":{
+            "kept_tags":["li","td","th","tr","thead","tfoot","tbody","p"]
+        }
+    }
+}
