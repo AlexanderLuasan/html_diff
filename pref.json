@@ -1,16 +1,17 @@
 {
-    "break_tags":["table","li","head"],
+    "break_tags":["table","li","head","figcaption"],
     "sub_break_tags":{
-        "table":0.7,
+        "table":0.9,
         "li":0.5
     },
     "context_escapes":{
         "table":["td","tr","thead","tfood","tbody"],
         "head":["title","meta"]
+        
     },
-    "modify_inside":["li"],
+    "modify_inside":["li","figcaption"],
     "text_tags":[],
-    "no_diff":["head","pre"],
+    "no_diff":["head"],
     "sub_rules":{
         "break_tags":["tr"],
         "sub_break_tags":{
@@ -18,7 +19,12 @@
         },
         "modify_inside":["tr"],
         "sub_rules":{
-            "kept_tags":["li","td","th","tr","thead","tfoot","tbody","p"]
+            "break_tags":["script","pre"],
+            "kept_tags":["li","td","th","tr","thead","tfoot","tbody","p"],
+            "no_diff":["script","style","pre"],
+            "escape_contexts":{
+                "pre":["pre"]
+            }
         }
     }
 }

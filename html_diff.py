@@ -14,6 +14,10 @@ ENCLOSED_RE = re.compile(r'^<[^/<>]*>.*</[^/<>]*>$')
 WORD_RE = re.compile(
     r'([^ \n\r\t,.&;/#=<>()-]+|(?:[ \n\r\t]|&nbsp;)+|[,.&;/#=<>()-])'
 )
+
+FRONT_TAG_RE = re.compile(r'.*<.*?>.*')
+BACK_TAG_RE = re.compile(r'.*</*?>.*')
+
 #WS_RE = re.compile(r'^([ \n\r\t]|&nbsp;)+$')
 WS_RE = re.compile(r'([ \n\r\t]|&nbsp;)+')
 GIT_DIFF_LINE_GETTER = re.compile(r'@@[^@]*@@')
@@ -116,6 +120,10 @@ class splitting_preferences():
         return False
     
     def require_escape(self,text):
+        #require at least one tag in the text
+        if(not BACK_TAG_RE.match(text) and not FRONT_TAG_RE.match(text)):
+            raise get_context("required context",BACK_TAG_RE,FRONT_TAG_RE)
+
         for (rule,front,back) in self.escape_rules:
             m = rule.match(text)
             m = front.match(text)
@@ -128,6 +136,12 @@ class splitting_preferences():
                         
         return False
     def require_escape_no_raise(self,text):
+        #require at least one tag in the text
+        if(not BACK_TAG_RE.match(text) and not FRONT_TAG_RE.match(text)):
+            raise get_context("required context",BACK_TAG_RE,FRONT_TAG_RE)
+
+        
+
         for (rule,front,back) in self.escape_rules:
             m = rule.match(text)
             m = front.match(text)
@@ -201,8 +215,8 @@ class html_differ(SequenceMatcher):
         end = ""
         text = []
         for item in del_items:
-            if(self.splitting_preferences.modify_inside(item) and self.splitting_preferences.get_subrules() != None):
-                new_sub_items = sum([[k] if k.startswith('<') else WORD_RE.findall(k) for k in html_splitter(item,self.splitting_preferences.get_subrules())],[])
+            if(self.splitting_preferences.modify_inside(item)):
+                new_sub_items = sum([[k] if k.startswith('<') else WORD_RE.findall(k) for k in html_splitter(item)],[])
                 end += self.clean_delete(new_sub_items)
             elif(item.startswith('<') and not self.splitting_preferences.treat_tag_as_text(item)):#insert the text wrapped in del tags treat small tags as text
                 if(not all([WS_RE.match(i) for i in text])): #not all white space
@@ -221,8 +235,8 @@ class html_differ(SequenceMatcher):
         text = []
         for item in ins_items:
             
-            if(self.splitting_preferences.modify_inside(item) and self.splitting_preferences.get_subrules() != None):
-                new_sub_items = sum([[k] if k.startswith('<') else WORD_RE.findall(k) for k in html_splitter(item,self.splitting_preferences.get_subrules())],[])
+            if(self.splitting_preferences.modify_inside(item)):
+                new_sub_items = sum([[k] if k.startswith('<') else WORD_RE.findall(k) for k in html_splitter(item)],[])
                 end += self.clean_insert(new_sub_items)
             elif(item.startswith('<') and not self.splitting_preferences.treat_tag_as_text(item)):#insert the text wrapped in ins check preferences for 
                 if(not all([WS_RE.match(i) for i in text])): #not all white space
@@ -326,7 +340,7 @@ def git_read_file(commit_a,file_path):
     out = run(['git','--no-pager','show',f"{commit_a}:{file_path}"],stdout=PIPE).stdout.decode("utf-8")
     return out.split("\n")
 
-def process_patch(file_a,file_b,patch,spliting_preferences):
+def process_patch(file_a,file_b,patch,spliting_preferences,min_start_a=0,min_start_b=0):
 
     text_a = "".join(file_a[patch["start_a"]:patch["start_a"]+patch["length_a"]])
     text_b = "".join(file_b[patch["start_b"]:patch["start_b"]+patch["length_b"]])
@@ -334,16 +348,19 @@ def process_patch(file_a,file_b,patch,spliting_preferences):
     try:
 
         #make sure the context is large enough 
-        spliting_preferences.require_escape(text_a)
-        spliting_preferences.require_escape(text_b)
+        if(min_start_a < patch["start_a"] and min_start_b < patch["start_b"]):
+            spliting_preferences.require_escape(text_a)
+            spliting_preferences.require_escape(text_b)
         diff = html_differ(text_a,text_b,splitting_preferences=spliting_preferences)
         end = diff.diff_html() 
         return {"new_text":end,"patch":patch}
     except get_context as con_req:
-        while not con_req.front_rule.match("".join(file_a[patch["start_a"]:patch["start_a"]+patch["length_a"]])):
+        while ( not con_req.front_rule.match("".join(file_b[patch["start_b"]:patch["start_b"]+patch["length_b"]])) 
+            or not con_req.front_rule.match("".join(file_a[patch["start_a"]:patch["start_a"]+patch["length_a"]])) ) \
+            and (patch["start_a"]>min_start_a and patch["start_b"]>min_start_b):
+
             patch["start_a"] -= 1
             patch["length_a"] += 1
-        while not con_req.front_rule.match("".join(file_b[patch["start_b"]:patch["start_b"]+patch["length_b"]])):
             patch["start_b"] -= 1
             patch["length_b"] += 1
         while not con_req.back_rule.match("".join(file_a[patch["start_a"]:patch["start_a"]+patch["length_a"]])):
@@ -351,7 +368,7 @@ def process_patch(file_a,file_b,patch,spliting_preferences):
         while not con_req.back_rule.match("".join(file_b[patch["start_b"]:patch["start_b"]+patch["length_b"]])):
             patch["length_b"] += 1
         
-        return process_patch(file_a,file_b,patch,spliting_preferences)
+        return process_patch(file_a,file_b,patch,spliting_preferences,min_start_a = min_start_a,min_start_b=min_start_b)
 
 
 
@@ -368,8 +385,17 @@ def process_file(patch_list,file_a,file_b,split_pref):
         if(patch["start_a"] + patch["length_a"] < end_a or patch["start_b"] + patch["length_b"] < end_b):
             log.INSTANCE.complete_work(1)
             continue
+        while patch["start_a"] < end_a and patch["start_b"] < end_b:
+            patch["start_a"] += 1
+            patch["length_a"] -= 1
+            patch["start_b"] += 1
+            patch["length_b"] -= 1
+        
+        if(patch["length_b"]<=0 or patch["length_a"]<=0):
+            log.INSTANCE.complete_work(1)
+            continue
 
-        result = process_patch(file_a,file_b,patch,split_pref)
+        result = process_patch(file_a,file_b,patch,split_pref,min_start_a=end_a,min_start_b=end_b)
         log.INSTANCE.complete_work(1)
         
         for i in range(result["patch"]["start_a"]+1,result["patch"]["start_a"]+result["patch"]["length_a"]):
