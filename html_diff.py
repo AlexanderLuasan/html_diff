@@ -120,7 +120,8 @@ class splitting_preferences():
         return False
     
     def require_escape(self,text):
-        if(not BACK_TAG_RE.match(text) or not FRONT_TAG_RE.match(text)):
+        #require at least one tag in the text
+        if(not BACK_TAG_RE.match(text) and not FRONT_TAG_RE.match(text)):
             raise get_context("required context",BACK_TAG_RE,FRONT_TAG_RE)
 
         for (rule,front,back) in self.escape_rules:
@@ -136,8 +137,9 @@ class splitting_preferences():
         return False
     def require_escape_no_raise(self,text):
         #require at least one tag in the text
-        if(not BACK_TAG_RE.match(text) or not FRONT_TAG_RE.match(text)):
-            return (BACK_TAG_RE,FRONT_TAG_RE)
+        if(not BACK_TAG_RE.match(text) and not FRONT_TAG_RE.match(text)):
+            raise get_context("required context",BACK_TAG_RE,FRONT_TAG_RE)
+
         
 
         for (rule,front,back) in self.escape_rules:
