@@ -1,7 +1,7 @@
 {
     "break_tags":["table","li","head"],
     "sub_break_tags":{
-        "table":0.7,
+        "table":0.9,
         "li":0.5
     },
     "context_escapes":{
@@ -18,7 +18,9 @@
         },
         "modify_inside":["tr"],
         "sub_rules":{
-            "kept_tags":["li","td","th","tr","thead","tfoot","tbody","p"]
+            "break_tags":["script"],
+            "kept_tags":["li","td","th","tr","thead","tfoot","tbody","p"],
+            "no_diff":["script","style"]
         }
     }
 }
