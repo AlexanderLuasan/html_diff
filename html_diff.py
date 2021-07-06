@@ -14,6 +14,10 @@ ENCLOSED_RE = re.compile(r'^<[^/<>]*>.*</[^/<>]*>$')
 WORD_RE = re.compile(
     r'([^ \n\r\t,.&;/#=<>()-]+|(?:[ \n\r\t]|&nbsp;)+|[,.&;/#=<>()-])'
 )
+
+FRONT_TAG_RE = re.compile(r'.*<.*?>.*')
+BACK_TAG_RE = re.compile(r'.*</*?>.*')
+
 #WS_RE = re.compile(r'^([ \n\r\t]|&nbsp;)+$')
 WS_RE = re.compile(r'([ \n\r\t]|&nbsp;)+')
 GIT_DIFF_LINE_GETTER = re.compile(r'@@[^@]*@@')
@@ -116,6 +120,9 @@ class splitting_preferences():
         return False
     
     def require_escape(self,text):
+        if(not BACK_TAG_RE.match(text) or not FRONT_TAG_RE.match(text)):
+            raise get_context("required context",BACK_TAG_RE,FRONT_TAG_RE)
+
         for (rule,front,back) in self.escape_rules:
             m = rule.match(text)
             m = front.match(text)
@@ -128,6 +135,11 @@ class splitting_preferences():
                         
         return False
     def require_escape_no_raise(self,text):
+        #require at least one tag in the text
+        if(not BACK_TAG_RE.match(text) or not FRONT_TAG_RE.match(text)):
+            return (BACK_TAG_RE,FRONT_TAG_RE)
+        
+
         for (rule,front,back) in self.escape_rules:
             m = rule.match(text)
             m = front.match(text)
